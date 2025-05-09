@@ -72,7 +72,7 @@ void Spectrogram::saveToImage(
     size_t w = matrix[0].size(), h = matrix.size();
     img_out.data.resize(w * h * 4);
     double range = opt.max_db - opt.min_db;
-    for (size_t x = 0; x < w; ++x)
+    for (size_t x = 0; x < w; ++x) {
         for (size_t y = 0; y < h; ++y) {
             float norm = (matrix[h - 1 - y][x] - opt.min_db) / range;
             uint8_t val = static_cast<uint8_t>(norm * 255);
@@ -82,6 +82,7 @@ void Spectrogram::saveToImage(
             img_out.data[idx + 2] = val;
             img_out.data[idx + 3] = 255;
         }
+    }
     img_out.width = w;
     img_out.height = h;
 }
@@ -94,13 +95,14 @@ SpectrogramMatrix Spectrogram::loadFromImage(
     size_t w = img.width, h = img.height;
     SpectrogramMatrix matrix(h, std::vector<double>(w));
     double range = max_db - min_db;
-    for (size_t x = 0; x < w; ++x)
+    for (size_t x = 0; x < w; ++x) {
         for (size_t y = 0; y < h; ++y) {
             uint8_t byte_val = img.data[(y * w + x) * 4];
             double db_val = min_db + (byte_val / 255.0) * range;
             double mag_val = std::pow(10.0, db_val / 20.0);
             matrix[h - 1 - y][x] = mag_val;
         }
+    }
 
     return matrix;
 }

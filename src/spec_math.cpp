@@ -76,14 +76,16 @@ SpectrogramMatrix SpecMath::stft(
         std::vector<double> real(n_fft, 0.0), imag(n_fft, 0.0);
         for (size_t n = 0; n < win_length; ++n) {
             size_t idx = frame * hop_length + n;
-            if (idx < samples.size())
+            if (idx < samples.size()) {
                 real[n] = samples[idx] * window[n];
-            else
+            } else {
                 real[n] = 0.0;
+            }
         }
         SpecMath::fft(real, imag, false);
-        for (size_t k = 0; k <= n_fft / 2; ++k)
+        for (size_t k = 0; k <= n_fft / 2; ++k) {
             matrix[k][frame] = std::hypot(real[k], imag[k]);
+        }
     }
     return matrix;
 }
@@ -103,10 +105,11 @@ ComplexSpectrogramMatrix SpecMath::stftComplex(
         std::vector<double> real(n_fft, 0.0), imag(n_fft, 0.0);
         for (size_t n = 0; n < win_length; ++n) {
             size_t idx = frame * hop_length + n;
-            if (idx < samples.size())
+            if (idx < samples.size()) {
                 real[n] = samples[idx] * window[n];
-            else
+            } else {
                 real[n] = 0.0;
+            }
         }
         SpecMath::fft(real, imag, false);
         for (size_t k = 0; k <= n_fft / 2; ++k) {
@@ -147,9 +150,11 @@ std::vector<double> SpecMath::istft(
         }
     }
     // normalize by window overlap
-    for (size_t i = 0; i < length; ++i)
-        if (sum_window[i] > 0)
+    for (size_t i = 0; i < length; ++i) {
+        if (sum_window[i] > 0) {
             signal[i] /= sum_window[i];
+        }
+    }
 
     return signal;
 }
@@ -192,9 +197,11 @@ std::vector<double> SpecMath::istftComplex(
     }
 
     // Normalize to compensate for windowing
-    for (size_t i = 0; i < length; ++i)
-        if (window_sum[i] > 1e-8)
+    for (size_t i = 0; i < length; ++i) {
+        if (window_sum[i] > 1e-8) {
             y[i] /= window_sum[i];
+        }
+    }
 
     return y;
 }
@@ -217,20 +224,23 @@ ComplexSpectrogramMatrix SpecMath::griffinLim(
 
     // Initialize random phase
     SpectrogramMatrix angle(spec.size(), std::vector<double>(n_frames));
-    for (size_t k = 0; k < spec.size(); ++k)
-        for (size_t t = 0; t < n_frames; ++t)
+    for (size_t k = 0; k < spec.size(); ++k) {
+        for (size_t t = 0; t < n_frames; ++t) {
             angle[k][t] = 2 * M_PI * ((double)rand() / RAND_MAX);
+        }
+    }
 
     SpectrogramMatrix real_spec(spec.size(), std::vector<double>(n_frames));
     SpectrogramMatrix ispec_spec(spec.size(), std::vector<double>(n_frames));
 
     for (size_t iter = 0; iter < iterations; ++iter) {
         // Construct complex spectrogram with current phase
-        for (size_t k = 0; k < spec.size(); ++k)
+        for (size_t k = 0; k < spec.size(); ++k) {
             for (size_t t = 0; t < n_frames; ++t) {
                 real_spec[k][t] = spec[k][t] * std::cos(angle[k][t]);
                 ispec_spec[k][t] = spec[k][t] * std::sin(angle[k][t]);
             }
+        }
 
         // Inverse STFT
         size_t length = (n_frames - 1) * hop_length + win_length;
@@ -240,17 +250,20 @@ ComplexSpectrogramMatrix SpecMath::griffinLim(
         auto [stft_real, stft_imag] = SpecMath::stftComplex(y, n_fft, hop_length, win_length);
 
         // Update phase
-        for (size_t k = 0; k < spec.size(); ++k)
-            for (size_t t = 0; t < n_frames; ++t)
+        for (size_t k = 0; k < spec.size(); ++k) {
+            for (size_t t = 0; t < n_frames; ++t) {
                 angle[k][t] = std::atan2(stft_imag[k][t], stft_real[k][t]);
+            }
+        }
     }
 
     // Final complex spectrogram
-    for (size_t k = 0; k < spec.size(); ++k)
+    for (size_t k = 0; k < spec.size(); ++k) {
         for (size_t t = 0; t < n_frames; ++t) {
             real_spec[k][t] = spec[k][t] * std::cos(angle[k][t]);
             ispec_spec[k][t] = spec[k][t] * std::sin(angle[k][t]);
         }
+    }
 
     return { real_spec, ispec_spec };
 }
