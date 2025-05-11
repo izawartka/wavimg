@@ -1,24 +1,18 @@
 #include "spec_math.hpp"
 
 void SpecMath::fft(
-    std::vector<double>& real, 
-    std::vector<double>& imag, 
+    std::vector<double>& real,
+    std::vector<double>& imag,
     bool inverse
 ) {
     const size_t n = real.size();
-    if (n != imag.size()) {
-        throw std::invalid_argument("FFT error: real and imag parts must be the same length");
-    }
-
-    // Check power of two
-    if ((n & (n - 1)) != 0) {
-        throw std::invalid_argument("FFT error: size must be a power of two (got " + std::to_string(n) + ")");
-    }
+    if (n != imag.size() || (n & (n - 1)))
+        throw std::invalid_argument("FFT size must be power-of-two and real/imag lengths match");
 
     // Bit-reversal permutation
-    unsigned int j = 0;
-    for (unsigned int i = 1; i < n; ++i) {
-        unsigned int bit = n >> 1;
+    unsigned j = 0;
+    for (unsigned i = 1; i < n; ++i) {
+        unsigned bit = n >> 1;
         for (; j & bit; bit >>= 1) j ^= bit;
         j |= bit;
         if (i < j) {
@@ -27,31 +21,25 @@ void SpecMath::fft(
         }
     }
 
-    // FFT
+    const auto& [W_real, W_imag] = twiddles(n, inverse);
     for (size_t len = 2; len <= n; len <<= 1) {
-        double angle = 2 * M_PI / len * (inverse ? -1 : 1);
-        double wlen_real = std::cos(angle);
-        double wlen_imag = std::sin(angle);
+        size_t half = len >> 1;
+        size_t stride = n / len;
         for (size_t i = 0; i < n; i += len) {
-            double w_real = 1.0;
-            double w_imag = 0.0;
-            for (size_t k = 0; k < len / 2; ++k) {
+            for (size_t k = 0; k < half; ++k) {
+				size_t w_idx = k * stride;
+				double w_r = W_real[w_idx];
+				double w_i = W_imag[w_idx];
                 size_t u = i + k;
-                size_t v = i + k + len / 2;
-                double u_real = real[u];
-                double u_imag = imag[u];
-                double v_real = real[v] * w_real - imag[v] * w_imag;
-                double v_imag = real[v] * w_imag + imag[v] * w_real;
-
-                real[u] = u_real + v_real;
-                imag[u] = u_imag + v_imag;
-                real[v] = u_real - v_real;
-                imag[v] = u_imag - v_imag;
-
-                double next_w_real = w_real * wlen_real - w_imag * wlen_imag;
-                double next_w_imag = w_real * wlen_imag + w_imag * wlen_real;
-                w_real = next_w_real;
-                w_imag = next_w_imag;
+                size_t v = u + half;
+                double u_r = real[u];
+                double u_i = imag[u];
+				double v_r = real[v] * w_r - imag[v] * w_i;
+				double v_i = real[v] * w_i + imag[v] * w_r;
+                real[u] = u_r + v_r;
+                imag[u] = u_i + v_i;
+                real[v] = u_r - v_r;
+                imag[v] = u_i - v_i;
             }
         }
     }
@@ -206,11 +194,38 @@ std::vector<double> SpecMath::istftComplex(
     return y;
 }
 
+std::map<size_t, std::vector<double>> SpecMath::m_hannWindowCache;
+
 std::vector<double> SpecMath::hannWindow(size_t win_length) {
-    std::vector<double> win(win_length);
-    for (size_t n = 0; n < win_length; ++n)
-        win[n] = 0.5 * (1 - std::cos(2 * M_PI * n / (win_length - 1)));
-    return win;
+	if (m_hannWindowCache.find(win_length) != m_hannWindowCache.end()) {
+		return m_hannWindowCache[win_length];
+	}
+
+	std::vector<double> window(win_length);
+	for (size_t n = 0; n < win_length; ++n) {
+		window[n] = 0.5 * (1 - std::cos(2 * M_PI * n / (win_length - 1)));
+	}
+	m_hannWindowCache[win_length] = window;
+	return window;
+}
+
+std::map<size_t, std::pair<std::vector<double>, std::vector<double>>> SpecMath::m_twiddlesCache;
+
+std::pair<std::vector<double>, std::vector<double>> SpecMath::twiddles(size_t n_fft, bool inverse)
+{
+	if (m_twiddlesCache.find(n_fft) != m_twiddlesCache.end()) {
+		return m_twiddlesCache[n_fft];
+	}
+
+	std::vector<double> W_real(n_fft), W_imag(n_fft);
+	for (size_t k = 0; k < n_fft; ++k) {
+		double angle = 2 * M_PI * k / n_fft;
+		if (inverse) angle = -angle;
+		W_real[k] = std::cos(angle);
+		W_imag[k] = std::sin(angle);
+	}
+	m_twiddlesCache[n_fft] = { W_real, W_imag };
+	return { W_real, W_imag };
 }
 
 ComplexSpectrogramMatrix SpecMath::griffinLim(

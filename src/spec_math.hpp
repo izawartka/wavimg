@@ -38,7 +38,11 @@ public:
         size_t length
     );
 
+    static std::map<size_t, std::vector<double>> m_hannWindowCache;
     static std::vector<double> hannWindow(size_t win_length);
+
+    static std::map<size_t, std::pair<std::vector<double>, std::vector<double>>> m_twiddlesCache;
+	static std::pair<std::vector<double>, std::vector<double>> twiddles(size_t n_fft, bool inverse);
 
     static ComplexSpectrogramMatrix griffinLim(
         const SpectrogramMatrix& spec,
